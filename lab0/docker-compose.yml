@@ -1,0 +1,48 @@
+# CS 450 Lab 0 -- the harness for the whole quarter.
+#
+# Three services:
+#   kvnode   the node you will keep rewriting (Lab 0: an echo service)
+#   proxy    an nginx load balancer, the only service reachable from your host
+#   client   a shell with curl in it, for poking the cluster from inside
+#
+# Two things are deliberately ABSENT, and both are absent for the same reason --
+# they would make `--scale kvnode=N` impossible:
+#
+#   * kvnode has no `ports:` mapping. Publishing a host port pins the service to
+#     one host port, and the second replica would fail to start with a conflict.
+#     Reach kvnode through the proxy instead.
+#   * no service sets `container_name:`. A fixed container name can only belong
+#     to one container, so replica 2 would collide with replica 1.
+#
+# Do not add either one. The checkpoint tests scale this file, and they will
+# fail if you do.
+#
+# Service names are also fixed: the grading scripts address your containers as
+# `kvnode`, `proxy` and `client`. Add services if you like; do not rename these.
+
+name: cs450
+
+services:
+  kvnode:
+    build: ./kvnode
+    environment:
+      NODE_PORT: "8080"
+    expose:
+      - "8080"
+    restart: unless-stopped
+
+  proxy:
+    build: ./proxy
+    depends_on:
+      - kvnode
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+  client:
+    build: ./client
+    depends_on:
+      - proxy
+    environment:
+      KV_TARGET: "http://proxy:8080"
+    command: ["sleep", "infinity"]

@@ -1,0 +1,19 @@
+# Build output (compile inside the container, don't commit binaries)
+target/
+*.class
+*.jar
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+
+# --- Belt and braces -----------------------------------------------------
+# Instructor material lives in ../instructor/ and must never appear in
+# this repository, which students can read. These patterns are a second line
+# of defence in case a file is ever copied back in by accident. The first
+# line of defence is that those files are not in this directory at all.
+NOTES-INSTRUCTOR.md
+grade_*.sh
+instructor/
+solutions/
