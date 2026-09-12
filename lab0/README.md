@@ -154,8 +154,10 @@ Do this once, before you start.
 3. Owner: **your own account**. Name: leave it as **`cs450-fall26-labs`**.
    Visibility: **Private**.
 4. Add the instructor as a collaborator: your repo → **Settings** → **Collaborators**
-   → **Add people** → **`torsten-grabs-bc`**. Read access is enough. Do this straight
-   away — work nobody can see cannot be graded.
+   → **Add people** → **`torsten-grabs-bc`**. There is no permission level to choose —
+   GitHub gives collaborators on a personal repository write access, and offers no
+   read-only option. The instructor only ever clones and reads; nothing is pushed to your
+   repository. Do this straight away — work nobody can see cannot be graded.
 5. Clone it and work there. This lab lives in `lab0/`.
 6. From the repository root, run **`./scripts/link-upstream.sh`** before you change
    anything. One command, once. It connects your copy to the course repository so that

@@ -18,7 +18,7 @@ Unlike a handout-plus-scaffold repo, **this repository is your working copy**. Y
 
 1. Post your GitHub username to the **GitHub username** assignment in Canvas.
 2. From this repository, click **Use this template** → **Create a new repository**. Owner: **your own account**. Name: keep it as **`cs450-fall26-labs`**. Visibility: **Private**.
-3. Add the instructor as a collaborator: your repo → **Settings** → **Collaborators** → add **`torsten-grabs-bc`**. Without this nobody can grade your work.
+3. Add the instructor as a collaborator: your repo → **Settings** → **Collaborators** → add **`torsten-grabs-bc`**. GitHub does not offer a read-only level for collaborators on a personal repository, so this grants write access; the instructor only clones and reads. Without it nobody can grade your work.
 4. Clone your copy to your machine.
 5. **Run `./scripts/link-upstream.sh` right away, before you change anything.** This is a one-time step that lets you collect later labs and fixes with a single command. Doing it first costs you nothing; doing it in week 6 costs you an afternoon of merge conflicts — see *Getting updates* below.
 6. Work in your copy. Start with `lab0/README.md`.
