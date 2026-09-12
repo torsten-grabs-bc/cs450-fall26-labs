@@ -157,6 +157,13 @@ Do this once, before you start.
    → **Add people** → **`torsten-grabs-bc`**. Read access is enough. Do this straight
    away — work nobody can see cannot be graded.
 5. Clone it and work there. This lab lives in `lab0/`.
+6. From the repository root, run **`./scripts/link-upstream.sh`** before you change
+   anything. One command, once. It connects your copy to the course repository so that
+   Lab 1 and any fixes reach you later with `git pull upstream main`. Because your copy
+   was made from a template it shares no history with the course repo, and git cannot
+   merge unrelated histories cleanly once you have started working — running it now, on
+   an untouched copy, is the difference between a silent success and a page of merge
+   conflicts in week 6. The root `README.md` explains the mechanics if you are curious.
 
 ### Before your first commit: hide your email address
 

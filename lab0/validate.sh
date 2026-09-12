@@ -29,6 +29,18 @@ bad()  { printf '  \033[31mFAIL\033[0m  %s\n' "$1"; fail=$((fail+1)); }
 info() { printf '        %s\n' "$1"; }
 head_() { printf '\n\033[1m%s\033[0m\n' "$1"; }
 
+# --- 0. course-repo link (advisory, never affects PASS/FAIL) ---------------
+# A repository created from the template shares no history with the course
+# repository until scripts/link-upstream.sh has been run. Say so here, at CP0,
+# rather than letting it surface as a wall of conflicts when Lab 1 ships.
+if git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1 &&
+   ! git -C "$ROOT" remote get-url upstream >/dev/null 2>&1; then
+  printf '\n\033[33mNOTE\033[0m  This repository is not linked to the course repository yet.\n'
+  printf '        Run ./scripts/link-upstream.sh from the repository root so you\n'
+  printf '        can collect Lab 1 and later fixes with a single command.\n'
+  printf '        It does not affect this check or your grade.\n'
+fi
+
 # --- pick a compose command ------------------------------------------------
 if docker compose version >/dev/null 2>&1; then
   DC=(docker compose)
