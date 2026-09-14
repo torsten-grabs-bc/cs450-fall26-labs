@@ -27,9 +27,9 @@ Unlike a handout-plus-scaffold repo, **this repository is your working copy**. Y
 
 ## Getting updates
 
-Labs 1 and 2 are published into this repository during the quarter, and fixes to
-existing labs land here too. Your copy does not update itself. When an update is
-announced in Canvas, commit whatever you are working on and pull:
+Labs 1 and 2 are added to this repository during the quarter, and fixes to earlier
+labs land here too. Your copy does not update itself. When an update is announced
+in Canvas, save your work first, then collect it:
 
 ```bash
 git add -A && git commit -m "work in progress"
@@ -37,35 +37,57 @@ git pull upstream main
 git push
 ```
 
-New folders always merge cleanly. A conflict only happens if you and the course
-repo changed the same file, which is rare and which git will name explicitly.
+New lab folders arrive without any fuss. The only time git asks you to sort
+something out is when you and the course repo changed the same file, which is
+rare — and it will tell you exactly which file.
 
-> If git answers `fatal: Need to specify how to reconcile divergent branches`,
-> it is asking whether you want merge or rebase. You want merge:
-> `git pull --no-rebase upstream main`. `link-upstream.sh` sets this for you, but
-> the setting lives in one clone — if you later clone your repository onto a
-> second machine, run the script again there.
+### If something looks wrong
 
-**Why the one-time link step exists.** Your repository was created from a
-template, so it starts with a fresh history and shares no commits with this one.
-Git merges two histories by comparing both against their common ancestor; with
-no shared ancestor it cannot tell your edits from the original, and reports
-*every* differing file as a conflict. `link-upstream.sh` performs that join once,
-while your copy is still identical to this repo and there is nothing to
-conflict — after which normal merging works for the rest of the quarter.
+**An editor opens, full of `#` lines.** That is vim asking you to approve a
+message. Type `:wq` and press Enter. (`link-upstream.sh` turns this off, so you
+should not see it.)
 
-**If you skipped it and have already done work,** do not merge. Take the new
-folder on its own instead:
+**`fatal: Need to specify how to reconcile divergent branches`.** Git wants to
+know how to combine the two sets of changes. Use:
+
+```bash
+git pull --no-rebase upstream main
+```
+
+`link-upstream.sh` sets this for you, but the setting belongs to one folder on one
+machine. If you clone your repository somewhere else, run the script again there.
+
+**A wall of conflicts, in files you never opened.** This means the link step never
+ran here. Do not try to fix the conflicts. Stop the attempt:
+
+```bash
+git merge --abort
+```
+
+If you have not started working yet, run `./scripts/link-upstream.sh` and you are
+set. If you have already done work, leave your repository as it is and take the
+new lab folder on its own:
 
 ```bash
 git fetch upstream
 git checkout upstream/main -- lab1/
 ```
 
-That copies in a new lab without touching anything you have written. It
-overwrites files it does land on, so use it for new folders, not for updates to
-files you have edited. Ask on the discussion board if you are unsure which case
-you are in.
+That brings in the new folder and leaves everything you have written alone. Use it
+for new folders only — it replaces any file it lands on. Ask on the discussion
+board if you are not sure which case you are in.
+
+### Why the link step exists
+
+Your copy and this repository started life separately, even though they hold the
+same files. Git works out what changed by comparing both sides to the point where
+they last agreed — and until they are linked, there is no such point, so git
+treats every difference as a clash, including changes only one side made.
+
+`link-upstream.sh` joins them once, while your copy is still identical to this one
+and there is nothing to clash over. After that, collecting updates is ordinary.
+That is why it belongs in week 1, before you write anything.
+
 
 Each lab folder contains its own `README.md` — that is the lab handout, and it is the authoritative version — plus a `validate.sh` you run before submitting. Canvas carries a short page per lab with the deadline, the points and a link here; it does not repeat the instructions, so if the two ever disagree, this repository wins.
 
