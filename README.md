@@ -40,6 +40,12 @@ git push
 New folders always merge cleanly. A conflict only happens if you and the course
 repo changed the same file, which is rare and which git will name explicitly.
 
+> If git answers `fatal: Need to specify how to reconcile divergent branches`,
+> it is asking whether you want merge or rebase. You want merge:
+> `git pull --no-rebase upstream main`. `link-upstream.sh` sets this for you, but
+> the setting lives in one clone — if you later clone your repository onto a
+> second machine, run the script again there.
+
 **Why the one-time link step exists.** Your repository was created from a
 template, so it starts with a fresh history and shares no commits with this one.
 Git merges two histories by comparing both against their common ancestor; with

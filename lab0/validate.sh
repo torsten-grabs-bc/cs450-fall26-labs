@@ -33,7 +33,13 @@ head_() { printf '\n\033[1m%s\033[0m\n' "$1"; }
 # A repository created from the template shares no history with the course
 # repository until scripts/link-upstream.sh has been run. Say so here, at CP0,
 # rather than letting it surface as a wall of conflicts when Lab 1 ships.
-if git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1 &&
+#
+# Only when a person is watching. Remotes are local configuration, not repository
+# content, so a fresh clone never has an 'upstream' -- including the throwaway
+# clone the grader makes. Without the [ -t 1 ] test this advisory would appear in
+# every grading log for every student, which is noise that means nothing there.
+if [ -t 1 ] &&
+   git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1 &&
    ! git -C "$ROOT" remote get-url upstream >/dev/null 2>&1; then
   printf '\n\033[33mNOTE\033[0m  This repository is not linked to the course repository yet.\n'
   printf '        Run ./scripts/link-upstream.sh from the repository root so you\n'
@@ -105,7 +111,7 @@ PY
 then
   ok "kvnode publishes no host port (required for scaling)"
 else
-  bad "kvnode publishes a host port -- replica 2 will fail with a port conflict"
+  bad "kvnode publishes a host port -- only one replica can bind it, so --scale fails. Remove the ports: mapping; use expose: instead"
 fi
 
 # --- 2. build --------------------------------------------------------------
