@@ -28,6 +28,10 @@ account and nothing to pay for. That is the whole reason this course has no lab 
   plugin on Linux. Check with `docker compose version`.
 - **git**, and a GitHub account. See "Getting your repository" below.
 - 8 GB of RAM and 2 CPUs minimum; 16 GB and 4 CPUs is a much better time.
+- **Host port 8080 free.** The proxy publishes there, and so does every command in
+  this handout and in the grader. Do not change the port mapping in
+  `docker-compose.yml` — free the port instead. `./validate.sh` checks this first
+  and tells you what to do.
 
 You do **not** need Java or Maven installed locally. Everything compiles inside a
 container. If you want to run the node outside Docker for debugging, you will need a
@@ -86,9 +90,30 @@ for i in $(seq 1 10); do curl -s http://localhost:8080/whoami; done
 ```
 
 **You should see more than one identifier.** Three replicas are running, and the proxy is
-spreading requests across them. If every request comes back with the same identifier,
-read the comment at the top of `proxy/nginx.conf` — it explains exactly why, and the fix
-is already in the file.
+spreading requests across them.
+
+All the same identifier? Check how many nodes you actually have before you suspect the
+proxy:
+
+```bash
+docker compose ps
+```
+
+If you see one `kvnode` and not three, nothing is wrong with the load balancing — there
+is only one node to balance across. Three things cause that:
+
+- **You did not pass `--scale kvnode=3`.** Note that a later plain `docker compose up -d`
+  scales you back down to one replica, silently. If you have come back to this after a
+  `docker compose down`, run the scale command again.
+- **Replicas could not start.** Check that `kvnode` has no `ports:` mapping and that
+  nothing sets `container_name:` — see "Two things you must not change" below. A second
+  replica cannot start if either is present.
+- **They are still starting.** Give it a couple of seconds after scaling and try again.
+
+If `docker compose ps` does show three running `kvnode` containers and you still get one
+identifier, then read the comment at the top of `proxy/nginx.conf` — it explains how the
+proxy finds the replicas, and the fix is already in the file, so check whether you have
+changed that `proxy_pass` line.
 
 ### 3. Use the client container
 
@@ -237,19 +262,24 @@ reserved for working through whatever did not pass, so if you are stuck, come to
 
 **`docker compose version` says command not found.** You have an old standalone
 `docker-compose`. Either install a current Docker Desktop, or use `docker-compose` in
-place of `docker compose` throughout — `verify.sh` handles both.
+place of `docker compose` throughout — `validate.sh` handles both.
 
 **The build fails downloading Maven plugins.** You are behind a proxy or offline. Try
 again on a different network before assuming it is broken.
 
-**`port is already allocated`.** Something else on your machine is using port 8080. Find
-it with `lsof -i :8080` (macOS/Linux). Change the *left* side of the proxy's port mapping
-in `docker-compose.yml` if you need to — `"8081:8080"` — and use that port everywhere,
-including when you run `verify.sh` (`PROXY_PORT=8081 ./validate.sh` is not wired up
-yet, so tell me if you need it).
+**`port is already allocated`.** Something else on your machine is using port 8080.
+Most often it is your own lab stack, still running from an earlier step — `docker compose
+down` and try again. Otherwise find the culprit and stop it:
 
-**Every request hits the same node.** See `proxy/nginx.conf`. This is the one genuinely
-interesting bug in the lab.
+```bash
+lsof -nP -iTCP:8080 -sTCP:LISTEN
+```
+
+Do **not** change the port mapping in `docker-compose.yml`. The grader addresses your
+proxy on 8080, so a stack published anywhere else fails the checkpoint. If you genuinely
+cannot free the port, post on the discussion board and we will sort it out.
+
+**Every request hits the same node.** See step 2 above — check `docker compose ps` first.
 
 **Everything is very slow.** Docker Desktop's default memory allocation is often too
 small. Raise it in Settings → Resources.

@@ -114,8 +114,37 @@ else
   bad "kvnode publishes a host port -- only one replica can bind it, so --scale fails. Remove the ports: mapping; use expose: instead"
 fi
 
-# --- 2. build --------------------------------------------------------------
-head_ "2. Build"
+# --- 2. port 8080 ----------------------------------------------------------
+# This lab requires host port 8080. Everything downstream -- the reachability
+# check below, the grader, and the commands in the handout -- addresses the
+# proxy there, so a port conflict has to be reported as an instruction rather
+# than surfacing as Docker's "port is already allocated" halfway through a
+# multi-minute build.
+head_ "2. Port 8080"
+if ! command -v lsof >/dev/null 2>&1; then
+  info "lsof not available -- skipping the port check"
+elif ! lsof -nP -iTCP:8080 -sTCP:LISTEN >/dev/null 2>&1; then
+  ok "port 8080 is free"
+# The most likely thing holding 8080 is the student's OWN stack, still running
+# from step 1 of the handout. Say that plainly instead of sending them off to
+# hunt a mystery process.
+elif [ -n "$("${DC[@]}" -p cs450 ps -q proxy 2>/dev/null)" ]; then
+  bad "port 8080 is held by your own lab stack, which is still running"
+  info "this self-check starts its own copy, so shut yours down first:"
+  info "    docker compose down"
+  info "then run ./validate.sh again"
+  exit 1
+else
+  bad "port 8080 is already in use on your machine"
+  info "this lab requires 8080. find what is holding it with:"
+  info "    lsof -nP -iTCP:8080 -sTCP:LISTEN"
+  info "stop that process, then run ./validate.sh again"
+  info "do NOT change the port mapping in docker-compose.yml -- the grader expects 8080"
+  exit 1
+fi
+
+# --- 3. build --------------------------------------------------------------
+head_ "3. Build"
 info "this can take a few minutes the first time"
 if "${DC[@]}" -p "$PROJECT" build >/tmp/cs450-build.log 2>&1; then
   ok "all three images build"
@@ -126,7 +155,7 @@ else
 fi
 
 # --- 3. bring the cluster up ----------------------------------------------
-head_ "3. Start ${REPLICAS} replicas"
+head_ "4. Start ${REPLICAS} replicas"
 if "${DC[@]}" -p "$PROJECT" up -d --scale "kvnode=${REPLICAS}" >/tmp/cs450-up.log 2>&1; then
   ok "compose up --scale kvnode=${REPLICAS} succeeded"
 else
@@ -143,7 +172,7 @@ else
 fi
 
 # --- 4. wait for the proxy ------------------------------------------------
-head_ "4. Reachability"
+head_ "5. Reachability"
 deadline=$(( $(date +%s) + BOOT_TIMEOUT ))
 up=false
 while [ "$(date +%s)" -lt "$deadline" ]; do
@@ -163,7 +192,7 @@ else
 fi
 
 # --- 5. the actual point of the lab ---------------------------------------
-head_ "5. Requests are spread across replicas"
+head_ "6. Requests are spread across replicas"
 ids=$(for _ in $(seq 1 "$REQUESTS"); do
         curl -fsS --max-time 3 --noproxy '*' http://127.0.0.1:8080/whoami 2>/dev/null
       done | sort -u)
@@ -184,7 +213,7 @@ else
 fi
 
 # --- 6. the client container ----------------------------------------------
-head_ "6. Client container"
+head_ "7. Client container"
 if "${DC[@]}" -p "$PROJECT" exec -T client kv whoami >/dev/null 2>&1; then
   ok "'kv whoami' works from inside the client container"
 else
