@@ -37,6 +37,25 @@ You do **not** need Java or Maven installed locally. Everything compiles inside 
 container. If you want to run the node outside Docker for debugging, you will need a
 JDK 21, but that is optional.
 
+### New to Docker?
+
+Read these four before the Monday lab session. They are short, one idea each, and each
+has a video. Together they cover everything this lab assumes:
+
+- [What is a container?](https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-a-container/)
+- [What is an image?](https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-an-image/)
+- [What is a registry?](https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-a-registry/)
+- [What is Docker Compose?](https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-docker-compose/)
+
+If you want one more, Docker's [multi-container applications](https://docs.docker.com/get-started/docker-concepts/running-containers/multi-container-applications/)
+page covers the same ground as `docker-compose.yml` in this folder — though reading our
+Compose file, which is commented throughout, will teach you more.
+
+One warning about search results: **Play with Docker**, the browser sandbox that ranks
+highly for "try Docker online", shut down on 1 March 2026. You need Docker installed
+locally for this course in any case — the lab runs several containers at once and keeps
+state between sessions.
+
 ---
 
 ## What is in here
@@ -130,19 +149,60 @@ outside it.
 
 This part is not graded, and it is the part worth your time.
 
+**Kill a node.**
+
 ```bash
 docker compose ps                      # find a running kvnode container
 docker kill <one of the kvnode containers>
-curl http://localhost:8080/whoami      # what happens now?
+for i in $(seq 1 10); do curl -s http://localhost:8080/whoami; done
 ```
 
-Try it a few times. Some requests succeed and some fail, and which ones depends on timing
-you do not control. Nothing in the system told you a node had died; you found out by a
-request failing.
+Your requests keep succeeding. What changed is that one identifier has stopped appearing.
+Nothing announced the death — you inferred it from the replies.
 
-Chapter 1 lists eight assumptions that people new to distributed systems make and that
-are all false. The first one is *the network is reliable*. You have just spent thirty
-seconds disproving it on your own laptop. Keep that in mind when the lecture gets to it.
+The reason it was painless is that two layers you did not write absorbed it. Docker's DNS
+stopped handing out the dead container's address, and nginx retries another node when a
+connection is refused. In Lab 1 and Lab 2 you are the one writing that layer, and the
+failure arrives on your desk instead.
+
+This is **partial failure**, and it is the property that makes a distributed system
+different in kind from a program running in one process. There, a crash takes everything
+with it and you know at once. Here, three nodes became two and the service carried on.
+
+**Now pause one instead.**
+
+```bash
+docker pause <a still-running kvnode container>
+curl http://localhost:8080/whoami           # count the seconds
+```
+
+A paused container stays registered in DNS and still completes the TCP handshake — the
+kernel accepts the connection — but nothing inside ever replies. The proxy waits out its
+five-second read timeout before giving up and trying somewhere else. The request succeeds,
+just very late.
+
+That is the failure worth remembering: **from the outside you cannot tell a slow node from
+a dead one.** You can wait longer, and be wrong about a node that was merely busy; or give
+up sooner, and be wrong about a node that was fine. There is no third option. Every
+failure detector you meet later in this course is a timeout, and every one of them is
+sometimes wrong. Run `docker unpause` when you have seen enough.
+
+**Optional: cut one off from the network.**
+
+```bash
+docker network disconnect cs450_default <a running kvnode container>
+```
+
+The node is still running and still believes it is healthy. It simply cannot be reached,
+and from the outside this looks exactly like the crash you started with. Nobody involved
+is wrong, and nobody can tell the difference. That is a network partition, and in a real
+deployment nobody types a command to cause one. Reconnect with
+`docker network connect cs450_default <container>`.
+
+Hold on to all three when the lecture reaches Chapter 1's eight false assumptions — not
+because you have disproved any of them here (every packet in this lab travels over
+loopback inside one machine, where the network really is reliable), but because these are
+the failures those assumptions are trying to warn you about.
 
 ### 5. Shut it down
 
