@@ -341,6 +341,24 @@ cannot free the port, post on the discussion board and we will sort it out.
 
 **Every request hits the same node.** See step 2 above — check `docker compose ps` first.
 
+**`exec /usr/local/bin/kv: no such file or directory`** (Windows). The file is there —
+what is missing is the interpreter. Git for Windows converts line endings on checkout, so
+the first line of the script became `#!/usr/bin/env bash` followed by a carriage return,
+and Linux went looking for a program called `bash\r`. Rebuild and it goes away:
+
+```bash
+docker compose up --build -d
+```
+
+If shell scripts misbehave on your host as well — `$'\r': command not found` from
+`./validate.sh` — refresh your whole checkout with the repository's line-ending rules:
+
+```bash
+git pull upstream main
+git rm --cached -r .
+git reset --hard
+```
+
 **Everything is very slow.** Docker Desktop's default memory allocation is often too
 small. Raise it in Settings → Resources.
 

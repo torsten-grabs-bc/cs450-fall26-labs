@@ -94,24 +94,41 @@ else
 fi
 
 # kvnode must not publish a host port, or the second replica cannot start.
-if python3 - "$ROOT" <<'PY' 2>/dev/null
-import subprocess, sys, json
-try:
-    import yaml  # optional
-except ImportError:
-    yaml = None
-raw = subprocess.run(["docker","compose","config","--format","json"],
-                     cwd=sys.argv[1], capture_output=True, text=True)
-if raw.returncode != 0:
-    sys.exit(2)
-cfg = json.loads(raw.stdout)
-ports = cfg.get("services", {}).get("kvnode", {}).get("ports", [])
-sys.exit(1 if ports else 0)
-PY
-then
-  ok "kvnode publishes no host port (required for scaling)"
-else
+#
+# This check has no external dependencies on purpose. It used to call python3,
+# which is not reliably present -- macOS has no `python`, plenty of Linux setups
+# have neither, and on Windows `python3` is often a Microsoft Store alias that
+# exists but does nothing. Worse, the old code read ANY non-zero exit as "ports
+# found", so a missing interpreter accused the student of publishing a host port
+# they had never added.
+#
+# An awk version had the mirror-image bug: no awk meant a silent PASS on a
+# compose file that really was broken. Both failure modes come from depending on
+# a tool that may not be installed, so this uses bash builtins only. If the
+# script is running at all, bash is present, and the check runs.
+#
+# $CONFIG is the `docker compose config` output captured above; the checks before
+# this one already rely on its two-space service indentation.
+kvnode_publishes_a_port() {
+  local line in_kvnode=0
+  while IFS= read -r line; do
+    case "$line" in
+      "  kvnode:"*)      in_kvnode=1; continue ;;
+      "  "[![:space:]]*) in_kvnode=0 ;;
+    esac
+    if [ "$in_kvnode" = 1 ]; then
+      case "$line" in
+        "    ports:"*) return 0 ;;
+      esac
+    fi
+  done <<<"$CONFIG"
+  return 1
+}
+
+if kvnode_publishes_a_port; then
   bad "kvnode publishes a host port -- only one replica can bind it, so --scale fails. Remove the ports: mapping; use expose: instead"
+else
+  ok "kvnode publishes no host port (required for scaling)"
 fi
 
 # --- 2. port 8080 ----------------------------------------------------------

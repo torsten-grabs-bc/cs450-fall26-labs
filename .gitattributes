@@ -1,0 +1,10 @@
+# Git for Windows checks out with core.autocrlf=true by default, which rewrites
+# LF to CRLF in the working tree. Anything that then runs inside a Linux
+# container breaks in a confusing way: the shebang becomes "#!/usr/bin/env bash\r",
+# the kernel looks for an interpreter named "bash\r", and exec fails with
+#     exec /usr/local/bin/kv: no such file or directory
+# naming the script rather than the missing interpreter.
+#
+# Force LF in the working tree for every text file. Binary files are detected
+# and left alone by text=auto.
+* text=auto eol=lf
