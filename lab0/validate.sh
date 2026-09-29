@@ -16,6 +16,7 @@ set -uo pipefail
 REPLICAS="${REPLICAS:-3}"
 REQUESTS="${REQUESTS:-15}"
 BOOT_TIMEOUT="${BOOT_TIMEOUT:-90}"
+SPREAD_TIMEOUT="${SPREAD_TIMEOUT:-45}"  # how long to keep trying before calling the spread bad
 PROJECT="cs450-verify-$$"
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -210,19 +211,42 @@ fi
 
 # --- 5. the actual point of the lab ---------------------------------------
 head_ "6. Requests are spread across replicas"
-ids=$(for _ in $(seq 1 "$REQUESTS"); do
-        curl -fsS --max-time 3 --noproxy '*' http://127.0.0.1:8080/whoami 2>/dev/null
-      done | sort -u)
-distinct=$(printf '%s\n' "$ids" | grep -c . || true)
+# Section 5 only proves the PROXY answers, and it can do that as soon as ONE
+# replica is up. Firing a single burst here and demanding all REPLICAS therefore
+# fails a stack that is merely still starting -- a JVM booting behind a cold
+# build -- with "requests are not spreading evenly", which sends the student to
+# nginx.conf to debug a problem they do not have. Seen in a dry run, on a
+# repository whose only change was an added comment line.
+#
+# So poll instead of sampling once: send a batch, remember which nodes answered,
+# and stop as soon as all of them have. The sleep between batches also crosses
+# nginx's 1s resolver TTL, so successive batches are not all served from a single
+# cached DNS answer.
+spread_deadline=$(( $(date +%s) + SPREAD_TIMEOUT ))
+seen=""
+rounds=0
+while :; do
+  rounds=$(( rounds + 1 ))
+  for _ in $(seq 1 "$REQUESTS"); do
+    r="$(curl -fsS --max-time 3 --noproxy '*' http://127.0.0.1:8080/whoami 2>/dev/null)"
+    [ -n "$r" ] && seen="${seen}${r}"$'\n'
+  done
+  ids="$(printf '%s' "$seen" | sort -u | sed '/^$/d')"
+  distinct="$(printf '%s\n' "$ids" | grep -c . || true)"
+  [ "$distinct" -ge "$REPLICAS" ] && break
+  [ "$(date +%s)" -ge "$spread_deadline" ] && break
+  sleep 2
+done
 
-info "${REQUESTS} requests reached ${distinct} distinct node(s):"
+info "${rounds} batch(es) of ${REQUESTS} requests reached ${distinct} distinct node(s):"
 printf '%s\n' "$ids" | sed 's/^/          /'
 
 if [ "$distinct" -ge "$REPLICAS" ]; then
   ok "all ${REPLICAS} replicas answered"
 elif [ "$distinct" -gt 1 ]; then
-  bad "only ${distinct} of ${REPLICAS} replicas answered -- requests are not spreading evenly"
-  info "check the resolver line in proxy/nginx.conf"
+  bad "only ${distinct} of ${REPLICAS} replicas answered within ${SPREAD_TIMEOUT}s"
+  info "one replica may have failed to start -- check: docker compose ps"
+  info "if all ${REPLICAS} are running, check the resolver line in proxy/nginx.conf"
 else
   bad "every request hit the same node"
   info "nginx resolves a hard-coded upstream once at startup. Use a variable in"
