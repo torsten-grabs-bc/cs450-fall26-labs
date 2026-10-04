@@ -1,0 +1,30 @@
+#!/bin/bash
+# CS 450 -- tiny client wrapper. In Lab 0 it just talks to the proxy over HTTP.
+# In Lab 1 you will replace the body of this script (or ignore it entirely and
+# write a real client) but the entry point stays the same.
+set -euo pipefail
+
+TARGET="${KV_TARGET:-http://proxy:8080}"
+
+usage() {
+  cat <<'USAGE'
+usage: kv <command>
+
+  whoami          ask the cluster which node answered
+  health          health-check the node that answers
+  status          print the full status page
+  spread [N]      send N requests (default 12) and count the distinct nodes
+USAGE
+}
+
+case "${1:-}" in
+  whoami)  curl -fsS "$TARGET/whoami" ;;
+  health)  curl -fsS "$TARGET/health" ;;
+  status)  curl -fsS "$TARGET/" ;;
+  spread)
+    n="${2:-12}"
+    for _ in $(seq 1 "$n"); do curl -fsS "$TARGET/whoami"; done | sort | uniq -c | sort -rn
+    ;;
+  ""|-h|--help|help) usage ;;
+  *) echo "unknown command: $1" >&2; usage; exit 2 ;;
+esac

@@ -8,6 +8,11 @@ target/
 .idea/
 .vscode/
 
+# Left behind when a file is replaced while something still has it open on a
+# FUSE-mounted filesystem -- the old inode is parked under this name instead of
+# being unlinked. They are stale copies of files that are already here.
+.fuse_hidden*
+
 # --- Belt and braces -----------------------------------------------------
 # Instructor material lives in ../instructor/ and must never appear in
 # this repository, which students can read. These patterns are a second line

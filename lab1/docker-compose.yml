@@ -1,0 +1,48 @@
+# CS 450 Lab 1 -- the same harness as Lab 0, with one addition.
+#
+# kvnode now listens on TWO ports:
+#   8080  HTTP, published through the proxy, load balanced across replicas
+#   9090  the line-based TCP protocol, reachable only from inside the network
+#
+# Neither is published directly. The proxy is still the only way in from your
+# machine, and it still only forwards HTTP. A TCP client has to live inside the
+# network -- that is what the client container is for.
+#
+# The project name differs from Lab 0 on purpose, so the two stacks do not fight
+# over the same containers. They still both want host port 8080, so bring one
+# down before starting the other.
+#
+# The rules from Lab 0 have not changed:
+#   * no ports: on kvnode -- it would pin the service to one host port and the
+#     second replica could not start
+#   * no container_name: on anything -- a fixed name belongs to one container
+#   * do not rename kvnode, proxy or client; the graders address them by name
+
+name: cs450-lab1
+
+services:
+  kvnode:
+    build: ./kvnode
+    environment:
+      NODE_PORT: "8080"
+      KV_PORT: "9090"
+    expose:
+      - "8080"
+      - "9090"
+    restart: unless-stopped
+
+  proxy:
+    build: ./proxy
+    depends_on:
+      - kvnode
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+  client:
+    build: ./client
+    depends_on:
+      - proxy
+    environment:
+      KV_TARGET: "http://proxy:8080"
+    command: ["sleep", "infinity"]
