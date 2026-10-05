@@ -123,10 +123,37 @@ else
 fi
 
 # --- 2. port 8080 ----------------------------------------------------------
+# Finding what listens on a port has no portable command. lsof is on macOS, ss on
+# most Linux, and Git Bash on Windows passes through Windows' netstat. Without
+# this fallback every Windows student silently loses this check -- and then meets
+# the same conflict later as a confusing curl: (7) or a Docker "port is already
+# allocated" halfway through a build.
+#
+# Returns 0 = something is listening, 1 = nothing is, 2 = cannot tell.
+# "Cannot tell" must never read as "free". A missing tool quietly becoming a PASS
+# is the bug python3 and awk already caused in this script once each.
+PORT_TOOL=""
+port_8080_busy() {
+  if command -v lsof >/dev/null 2>&1; then
+    PORT_TOOL="lsof -nP -iTCP:8080 -sTCP:LISTEN"
+    lsof -nP -iTCP:8080 -sTCP:LISTEN >/dev/null 2>&1
+  elif command -v ss >/dev/null 2>&1; then
+    PORT_TOOL="ss -ltnp | grep :8080"
+    ss -ltn 2>/dev/null | grep -q ':8080[[:space:]]'
+  elif command -v netstat >/dev/null 2>&1; then
+    PORT_TOOL="netstat -ano | findstr :8080"
+    netstat -an 2>/dev/null | grep -qE '[:.]8080[[:space:]].*LISTEN'
+  else
+    return 2
+  fi
+}
+
 head_ "2. Port 8080"
-if ! command -v lsof >/dev/null 2>&1; then
-  info "lsof not available -- skipping the port check"
-elif ! lsof -nP -iTCP:8080 -sTCP:LISTEN >/dev/null 2>&1; then
+port_8080_busy; busy=$?
+if [ "$busy" -eq 2 ]; then
+  info "no lsof, ss or netstat here -- cannot check whether 8080 is free"
+  info "if the build below fails with \"port is already allocated\", that is why"
+elif [ "$busy" -ne 0 ]; then
   ok "port 8080 is free"
 elif [ -n "$("${DC[@]}" -p cs450-lab1 ps -q proxy 2>/dev/null)$("${DC[@]}" -p cs450 ps -q proxy 2>/dev/null)" ]; then
   bad "port 8080 is held by your own stack, which is still running"
@@ -135,7 +162,7 @@ elif [ -n "$("${DC[@]}" -p cs450-lab1 ps -q proxy 2>/dev/null)$("${DC[@]}" -p cs
   exit 1
 else
   bad "port 8080 is already in use on your machine"
-  info "find what is holding it:  lsof -nP -iTCP:8080 -sTCP:LISTEN"
+  info "find what is holding it:  $PORT_TOOL"
   info "do NOT change the port mapping -- the grader expects 8080"
   exit 1
 fi

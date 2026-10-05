@@ -218,8 +218,9 @@ name for you to paste into the Canvas assignment.
 **If it prints anything other than "Submitted", you have not submitted.**
 
 At CP0, some students who had already done the work were initially not graded, because the tag
-never left their laptop. An ordinary `git push` does not send tags, and GitHub
-Desktop does not create them.
+never left their laptop. `git push` sends your commits; it does not send tags
+unless you name one — `git push origin cp1`. GitHub Desktop cannot create a tag
+at all.
 
 ---
 

@@ -7,9 +7,10 @@
 # Tags the current commit, pushes the branch and the tag, and then asks GitHub
 # whether the tag actually arrived. That last step is the point of this script.
 #
-# At CP0, thirteen of fifteen students who had done the work were not graded,
-# because the tag never left their laptop. An ordinary `git push` does not send
-# tags, and GitHub Desktop does not create them. Every one of those students
+# At CP0, some students who had already done the work were initially not
+# graded, because the tag never left their laptop. `git push` sends your
+# commits; it does not send tags unless you name one -- `git push origin cp1`.
+# GitHub Desktop cannot create a tag at all. Every one of those students
 # believed they had submitted. This script does not let you believe that: if it
 # prints anything other than "Submitted", you have not submitted.
 #
