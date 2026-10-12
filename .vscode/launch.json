@@ -1,0 +1,13 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "java", "request": "attach", "name": "Lab 1 — kvnode",
+      "hostName": "localhost", "port": 5005
+    },
+    {
+      "type": "java", "request": "attach", "name": "Lab 0 — kvnode",
+      "hostName": "localhost", "port": 5006
+    }
+  ]
+}

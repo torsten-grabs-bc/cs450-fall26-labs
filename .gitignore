@@ -6,7 +6,8 @@ target/
 # OS / editor
 .DS_Store
 .idea/
-.vscode/
+.vscode/*
+!.vscode/launch.json
 
 # Left behind when a file is replaced while something still has it open on a
 # FUSE-mounted filesystem -- the old inode is parked under this name instead of
