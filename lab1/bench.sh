@@ -30,20 +30,14 @@
 #                server's best case and it is what you want for a throughput
 #                figure, because it keeps the server busy.
 #
-#   latency      mean round-trip time for a single request on a fresh
-#                connection, measured serially with nobody else running. That
-#                includes the TCP handshake, and for REST the HTTP request and
-#                response headers too. It is the number a user would feel.
+# There is no latency column, and that is deliberate. There used to be one.
+# Every way of measuring it from out here spends longer starting a client
+# process than the request itself takes, so the figure tracked the measuring
+# tool instead of your server -- it barely moved when the server changed. A
+# number that does not respond to the thing it claims to measure is worse than
+# no number at all. Throughput is the honest one, so throughput is what you get.
 #
-#                Both protocols are timed from INSIDE the client container, in
-#                one `docker compose exec` for the whole loop. An earlier
-#                version paid one exec per sample, and `docker compose exec`
-#                costs tens of milliseconds to start -- so it reported Docker's
-#                process startup and called it network latency. If you ever see
-#                a latency figure that does not move when the server changes,
-#                suspect the instrument before you believe the number.
-#
-# Both are timed from ONE clock, here on your machine, by starting a stopwatch
+# It is timed from ONE clock, here on your machine, by starting a stopwatch
 # before and stopping it after. That is the only honest thing a single machine
 # can measure. If you wanted to know how long the request took to travel one
 # way -- how much of it was the network out, the server, the network back --
@@ -81,7 +75,6 @@ esac
 PROTO="${1:-}"
 CLIENTS="${2:-4}"
 REQUESTS="${3:-500}"
-LATENCY_SAMPLES="${LATENCY_SAMPLES:-30}"
 
 case "$PROTO" in
   tcp|rest) ;;
@@ -132,43 +125,71 @@ if [ "$probe" != "VALUE alive" ]; then
 fi
 
 # --- the label is checked --------------------------------------------------
-# Hold one connection open and idle, then send a request down a second one. A
-# server that serves the connection it just accepted is stuck in a blocking read
-# on the first one, so the second request goes unanswered. A server that hands
+# Hold one connection open and busy, then send a request down a second one. A
+# single-threaded server is inside readLine() on the first connection and never
+# reaches accept(), so the second request goes unanswered. A server that hands
 # each connection to its own thread answers it immediately.
 #
 # A direct test of the thing itself, rather than a guess from timings: a
 # one-core machine shows little speed-up either way, and telling those two cases
 # apart is the whole point of the comparison.
+#
+# The holder paces its lines with "nc -i 1" on purpose. BusyBox nc half-closes
+# the write side as soon as its stdin has nothing more ready to send, and the
+# server then reads EOF, closes the socket and goes back to accept() -- so an
+# idle holder leaves the server free and every server looks concurrent. Pacing
+# keeps real traffic on the connection for the whole probe window. The delay
+# applies before the FIRST line too, so the replies land one per second from
+# t=1. HELD is read at a fixed t=4 rather than after a sleep: the probe
+# returns instantly against a threaded server and only takes its full two
+# seconds when it goes unanswered, so anything relative to it drifts.
+#
+# HELD is how many replies the holder had collected by the time the probe
+# finished. Fewer than two means the holder was not holding anything open, so
+# the answer would be meaningless: say so instead of guessing.
 printf 'checking the %s flag ... ' "--$MODE"
-conc="$("${DC[@]}" exec -T client sh -c '
-  ( sleep 5 | nc -w 6 kvnode 9090 >/dev/null 2>&1 ) &
+out="$("${DC[@]}" exec -T client sh -c '
+  t0=$(date +%s)
+  printf "PUT __bench_hold__ x\nGET __bench_hold__\nGET __bench_hold__\nGET __bench_hold__\nGET __bench_hold__\nGET __bench_hold__\n" \
+    | nc -i 1 -w 12 kvnode 9090 > /tmp/bench_hold.out 2>&1 &
   holder=$!
   sleep 1
-  printf "GET __bench_conc_probe__\n" | nc -w 2 kvnode 9090 2>/dev/null
+  echo "PROBE:$(printf "GET __bench_hold__\n" | nc -w 2 kvnode 9090 2>/dev/null | tr -d "\r" | tail -1)"
+  while [ $(( $(date +%s) - t0 )) -lt 4 ]; do sleep 1; done
+  echo "HELD:$(wc -l < /tmp/bench_hold.out | tr -d " ")"
   kill $holder 2>/dev/null
   exit 0
-' 2>/dev/null | tr -d '\r' | tail -1)"
+' 2>/dev/null | tr -d '\r')"
 
-if [ -n "$conc" ]; then actual=multi; else actual=single; fi
+probe_reply="$(printf '%s\n' "$out" | sed -n 's/^PROBE://p')"
+held_lines="$(printf '%s\n' "$out" | sed -n 's/^HELD://p')"
+case "$held_lines" in ''|*[!0-9]*) held_lines=0 ;; esac
+
+if [ -n "$probe_reply" ]; then actual=multi; else actual=single; fi
 
 if [ "${BENCH_SKIP_LABEL_CHECK:-}" = 1 ]; then
   echo "skipped"
+elif [ "$held_lines" -lt 2 ]; then
+  echo "cannot tell"
+  echo >&2
+  echo "Could not hold a connection open long enough to test, so the --$MODE flag" >&2
+  echo "was taken at face value. The numbers are being written; check the label at" >&2
+  echo "the top of the file yourself." >&2
+  echo >&2
 elif [ "$actual" != "$MODE" ]; then
   echo "no"
   echo >&2
   if [ "$actual" = multi ]; then
     echo "Your server answered a second client while the first connection was still" >&2
-    echo "open, so it handles concurrent clients." >&2
+    echo "open and busy, so it handles concurrent clients." >&2
   else
     echo "Your server did not answer a second client while the first connection was" >&2
-    echo "still open, so it serves one at a time." >&2
+    echo "still open and busy, so it serves one at a time." >&2
   fi
   echo >&2
   echo "Nothing was written. Re-run with --$actual." >&2
   echo >&2
-  echo "(A single-threaded server that closes idle connections looks concurrent to" >&2
-  echo " this check. BENCH_SKIP_LABEL_CHECK=1 goes ahead anyway.)" >&2
+  echo "(BENCH_SKIP_LABEL_CHECK=1 goes ahead anyway.)" >&2
   exit 1
 else
   echo "ok"
@@ -186,7 +207,7 @@ if [ "$PROTO" = rest ]; then
     exit 1
   fi
 fi
-"${DC[@]}" exec -T client sh -c "printf 'DEL %s\n' '$probe_key' | nc -w 2 kvnode 9090" >/dev/null 2>&1
+"${DC[@]}" exec -T client sh -c "printf 'DEL %s\nDEL __bench_hold__\n' '$probe_key' | nc -w 2 kvnode 9090" >/dev/null 2>&1
 
 # --- warm up ---------------------------------------------------------------
 # The JIT compiles your hot path after it has seen it a few thousand times.
@@ -224,39 +245,9 @@ total=$(( CLIENTS * REQUESTS ))
 throughput="$(perl -e "printf '%.0f', $total / ($elapsed_ms/1000)")"
 echo "done"
 
-# --- latency ---------------------------------------------------------------
-# Serial, one request per connection, nothing else running.
-printf 'latency: %s single requests ... ' "$LATENCY_SAMPLES"
-# One exec for the whole loop, and the loop runs inside the container for both
-# protocols -- same instrument, same vantage point. Timed with the container's
-# own clock, which is the only one that sees both ends of these requests.
-if [ "$PROTO" = tcp ]; then
-  inner="i=1; while [ \$i -le $LATENCY_SAMPLES ]; do \
-           printf 'GET warm1\\n' | nc -w 2 kvnode 9090 >/dev/null; \
-           i=\$((i+1)); done"
-else
-  inner="i=1; while [ \$i -le $LATENCY_SAMPLES ]; do \
-           curl -s -o /dev/null http://proxy:8080/kv/warm1; \
-           i=\$((i+1)); done"
-fi
-lat_raw="$("${DC[@]}" exec -T client sh -c \
-  "s=\$(date +%s%N); $inner; e=\$(date +%s%N); echo \$(( (e - s) / 1000000 ))" 2>/dev/null \
-  | tr -d '\r')"
-case "$lat_raw" in
-  ''|*[!0-9]*)
-    latency="n/a"
-    echo "failed"
-    echo "  could not time inside the container (busybox date without %N?)" >&2
-    ;;
-  *)
-    latency="$(perl -e "printf '%.2f', $lat_raw / $LATENCY_SAMPLES")"
-    echo "done"
-    ;;
-esac
-
 # --- report ----------------------------------------------------------------
-line="$(printf '%-5s clients=%-3s requests=%-6s elapsed=%6sms throughput=%7s req/s latency=%8sms node=%s' \
-        "$PROTO" "$CLIENTS" "$total" "$elapsed_ms" "$throughput" "$latency" "$node")"
+line="$(printf '%-5s clients=%-3s requests=%-6s elapsed=%6sms throughput=%7s req/s node=%s' \
+        "$PROTO" "$CLIENTS" "$total" "$elapsed_ms" "$throughput" "$node")"
 
 {
   if [ ! -s "$OUT" ]; then
@@ -266,8 +257,7 @@ line="$(printf '%-5s clients=%-3s requests=%-6s elapsed=%6sms throughput=%7s req
       echo "# CS 450 Lab 1 benchmark results -- MULTITHREADED server (concurrent clients)"
     fi
     echo "# throughput: pipelined, all clients at once."
-    echo "# latency:    one request per connection, serial, measured alone."
-    echo "# Both timed on this machine's clock. See the comment at the top of bench.sh."
+    echo "# Timed on this machine's clock. See the comment at the top of bench.sh."
     echo "# $(date)"
     echo
   fi

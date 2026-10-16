@@ -265,16 +265,17 @@ cd lab1
 ```
 
 Run it for both protocols at 1, 4 and 16 clients — six runs, all appended to
-`bench.multi.txt`. It reports throughput and round-trip latency.
+`bench.multi.txt`. It reports throughput.
 
 You end up with two files: `bench.single.txt` from CP1 and `bench.multi.txt`
 from now. The TCP rows at 1 and 4 clients appear in both, and the gap between
 them is what the write-up is about.
 
-Note that it measures **round-trip** latency, timed by one clock in the client.
-Measuring how long the request took to travel *one way* would need the client and
-server clocks to agree, and they do not. That is section 5.1, and it is the first
-thing we will talk about at the debrief.
+Note that everything is timed by **one clock**, the one on your own machine, with a
+stopwatch started before the run and stopped after it. Measuring how long a single
+request took to travel *one way* would need the client and server clocks to agree,
+and they do not. That is section 5.1, and it is the first thing we will talk about
+at the debrief.
 
 ### Submit
 
@@ -355,3 +356,10 @@ it is listed here. Run `git pull upstream main` to collect changes.
 - **Sun Oct 4** — First release. CP1 asks you to benchmark your single-threaded
   server before CP2 replaces it, with `./bench.sh --single`; CP2 uses
   `--multi`. Lab 1 is submitted as one PDF rather than a file plus a text box.
+- **Fri Oct 16** — `bench.sh` no longer reports a latency column. Measuring it from
+  outside the container cost more time than the request itself took, so the figure
+  tracked the measuring tool rather than your server. Throughput is unchanged and is
+  what the write-up argues about. Rows already in your `bench.*.txt` files keep their
+  old wider format — leave them, they still count. The `--single`/`--multi` check was
+  fixed too: it could report a single-threaded server as concurrent and refuse a
+  correct `--single` run.
