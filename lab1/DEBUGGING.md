@@ -137,8 +137,6 @@ only to add it back later when you are coding again. Instead, you can
 create `docker-compose.debug.yml` which you instruct Docker to load when starting
 your stack for a debugging session. 
 
-Besides that, you also 
-
 **1. `docker-compose.debug.yml`**
 
 If you want to be able to attach the debugger in each lab, you need the  
@@ -209,8 +207,7 @@ docker compose -f docker-compose.yml -f docker-compose.debug.yml logs kvnode | h
 docker compose -f docker-compose.yml -f docker-compose.debug.yml port kvnode 5005
 ```
 
-This checks that the agent is loaded and listening, that the port is published to the host, 
-and that you can reach it. The first command shows the agent was loaded and is listening — you want all
+The first command shows the agent was loaded and is listening — you want all
 four startup lines, including `Listening for transport dt_socket at address:
 5005`. The second prints the host side of the port mapping, which must be
 `0.0.0.0:5005`. If it prints nothing, the container was started without the
@@ -224,7 +221,8 @@ picker (lab0 or lab1 at this point). Then hit F5.
 **4. Set a breakpoint**
 
 As you know, in VSCode, just click to the left of the code line.
-The breakpoint should show in solid red. Otherwise, the attach didn't work properly.
+The breakpoint should show in solid red for a process with a correctly attached debugger. 
+Otherwise, the attach didn't work properly.
 The most likely cause for that is that your most recent edits in your Java code
 did not get built. Make sure you started the Docker stack with `--build`.
 
@@ -253,9 +251,69 @@ docker compose down
 
 ## Timeouts and the debugger
 
-Note that client (or your own commands) may use timeouts and fire `IOException`
+Note that the client (or your own commands) may use timeouts and fire `IOException`
 inside your Java code. If you are debugging interactively, make sure you are 
 removing timeouts - or using very long ones.
+
+**On the REST side, the proxy has a timeout too (CP2).** While you sit on a
+breakpoint, `nginx` is waiting for an answer from `kvnode` that is not coming.
+Our `proxy/nginx.conf` allows five seconds:
+
+```nginx
+proxy_read_timeout    5s;
+```
+
+After that, `nginx` gives up and answers `curl` with `504 Gateway Time-out` -
+and when you finally step past the breakpoint, your handler writes its response
+to a connection nobody is reading any more. The confusing part is what you see:
+a clean HTTP error that looks like your code returned something, when in fact
+your code had not finished running yet.
+
+Do not edit `proxy/nginx.conf` to fix this. That file is used by `validate.sh`
+and by the benchmark, and a five-second timeout there is intentional. The lab
+ships a second copy for debugging, `proxy/nginx.debug.conf`, identical except
+that it waits an hour:
+
+```nginx
+proxy_read_timeout    3600s;
+proxy_send_timeout    3600s;
+```
+
+`docker-compose.debug.yml` mounts that copy over the original, so the longer
+timeout applies only when you start the stack with both compose files:
+
+```yaml
+  proxy:
+    volumes:
+      - ./proxy/nginx.debug.conf:/etc/nginx/nginx.conf:ro
+```
+
+Both files come with the lab - if you picked up the latest changes from the
+course repo, there is nothing for you to create here.
+
+Recreate the proxy and check that the container really picked up the debug copy:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.debug.yml up -d --force-recreate proxy
+docker compose -f docker-compose.yml -f docker-compose.debug.yml exec proxy grep proxy_read_timeout /etc/nginx/nginx.conf
+```
+
+The second command must print `3600s`. If it prints `5s`, the container is still
+running the config baked into the image.
+
+Why `--force-recreate` rather than `--build`? Nothing here goes into an image.
+The config is mounted from your folder and read when the container starts, so
+there is nothing to rebuild - but `nginx` reads its configuration once, at
+startup, and keeps it in memory. Editing the file under a running `nginx`
+changes nothing until the process restarts. Note the contrast with `kvnode`,
+where your Java *is* baked into the image: there you need `--build`, and Docker
+then replaces the container for you because the image changed. 
+
+A reload is quicker than a recreate once the mount is in place:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.debug.yml exec proxy nginx -s reload
+```
 
 ---
 
@@ -270,3 +328,7 @@ what you saw, what you expected.
 
 - **Sun Oct 11** - First version.
 - **Mon Oct 12** - Last touches on first version.
+- **Sun Oct 18** - Added the proxy timeout to "Timeouts and the debugger": while
+  you are stopped on a breakpoint, `nginx` gives up after five seconds and answers
+  `curl` with a `504`. Only affects REST debugging in CP2. `proxy/nginx.debug.conf`
+  ships with the lab, so pull the latest changes rather than writing it yourself.

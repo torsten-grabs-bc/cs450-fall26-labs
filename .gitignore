@@ -19,3 +19,6 @@ NOTES-INSTRUCTOR.md
 grade_*.sh
 instructor/
 solutions/
+
+# Working backups, never published
+_backups/

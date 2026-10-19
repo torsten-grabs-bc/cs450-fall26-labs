@@ -4,3 +4,6 @@ services:
       JAVA_TOOL_OPTIONS: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"
     ports:
       - "5005:5005"
+  proxy:
+    volumes:
+      - ./proxy/nginx.debug.conf:/etc/nginx/nginx.conf:ro
