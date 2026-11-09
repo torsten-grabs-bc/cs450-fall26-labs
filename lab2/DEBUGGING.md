@@ -51,6 +51,55 @@ runs against the real timeouts.
 | Both clients get the lock, through the same node | `LockManager.acquire`, at the top — two threads are getting past the local lock |
 | A `PUT` hangs forever | `Peers.ask`, and then the other node's `onLockRequest`: somebody is deferring and never being woken |
 | A `PUT` returns OK but one node is missing the value | `TwoPhase.put`, after the votes — did you reply to the client before every ACK came back? |
+| Every node stops answering, or a `PUT` errors after exactly five seconds | Not a breakpoint — take a thread dump. See the next section |
+
+## When the lock deadlocks
+
+The same deadlock looks like two different problems depending on which compose
+file you are running.
+
+Under a plain `docker compose up`, `PEER_TIMEOUT_MS` is five seconds, so the
+stuck call gives up and you get:
+
+```
+ERR could not take the lock on colour
+```
+
+which reads like a network problem and is not one. Under the debug overlay the
+timeout is an hour, so the identical bug is a permanent hang. **A `PUT` that
+sits for about five seconds and then errors is a deadlock until proven
+otherwise.**
+
+**Look at the threads.** The runtime image is a JRE, so there is no `jstack`.
+Send the JVM a quit signal instead — it prints every thread's stack and carries
+on running:
+
+```bash
+docker compose exec kvnode1 kill -3 1
+```
+
+```bash
+docker compose logs --tail 200 kvnode1
+```
+
+A thread parked in `acquire` and another parked in `onLockRequest` on the same
+key is the answer. Attaching the debugger and opening the thread list shows the
+same thing more comfortably, which is one more reason to run the overlay.
+
+**Three ways to build one**, none of them a fault in Ricart & Agrawala:
+
+- *The local lock on the receive path.* `acquire` holds a key's local lock
+  while it waits for its GRANTs. If `onLockRequest` takes that same lock, a
+  node that is waiting cannot answer anyone, and two nodes waiting on each
+  other never recover. The receive path takes the short state mutex and waits
+  on a condition — never the local lock.
+- *The state mutex held across the network call.* The same shape. Set `wanted`
+  and the timestamp, release the mutex, and only then send. A node still
+  holding its mutex while `askAll` is in flight cannot serve the requests
+  arriving at it.
+- *Two keys at once.* Nothing in this lab takes two locks, so this one is
+  yours to invent. One thread taking K then L while another takes L then K is
+  the textbook deadlock; the fix is to acquire keys in a fixed order.
 
 ## Reading the log
 
