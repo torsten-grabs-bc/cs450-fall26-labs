@@ -2,12 +2,34 @@
   "version": "0.2.0",
   "configurations": [
     {
+      "type": "java", "request": "attach", "name": "Lab 2 — kvnode1",
+      "hostName": "localhost", "port": 5011,
+      "projectName": "kvnode"
+    },
+    {
+      "type": "java", "request": "attach", "name": "Lab 2 — kvnode2",
+      "hostName": "localhost", "port": 5012,
+      "projectName": "kvnode"
+    },
+    {
+      "type": "java", "request": "attach", "name": "Lab 2 — kvnode3",
+      "hostName": "localhost", "port": 5013,
+      "projectName": "kvnode"
+    },
+    {
       "type": "java", "request": "attach", "name": "Lab 1 — kvnode",
       "hostName": "localhost", "port": 5005
     },
     {
       "type": "java", "request": "attach", "name": "Lab 0 — kvnode",
       "hostName": "localhost", "port": 5006
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Lab 2 — all three nodes",
+      "configurations": ["Lab 2 — kvnode1", "Lab 2 — kvnode2", "Lab 2 — kvnode3"],
+      "stopAll": true
     }
   ]
 }

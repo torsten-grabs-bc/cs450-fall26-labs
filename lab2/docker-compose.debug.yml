@@ -1,0 +1,40 @@
+# CS 450 Lab 2 -- debugging overlay. Loaded only when you ask for it:
+#
+#     docker compose -f docker-compose.yml -f docker-compose.debug.yml up -d
+#
+# Each node gets its own debugger port, because in this lab the interesting
+# breakpoints are on two nodes at once: one deferring a LOCK and another
+# waiting for the grant. Attach to both and you can watch the deferral happen.
+#
+#     kvnode1  5011        kvnode2  5012        kvnode3  5013
+#
+# suspend=n so the stack still comes up if you are not attached yet.
+#
+# PEER_TIMEOUT_MS goes to an hour. The default of five seconds is correct in
+# normal operation -- a peer that has not answered in five seconds is gone --
+# but while you are stopped on a breakpoint the node you are inspecting answers
+# nobody, and its peers would abort the transaction underneath you. See
+# DEBUGGING.md.
+
+services:
+  kvnode1:
+    environment:
+      JAVA_TOOL_OPTIONS: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"
+      PEER_TIMEOUT_MS: "3600000"
+    ports:
+      - "5011:5005"
+  kvnode2:
+    environment:
+      JAVA_TOOL_OPTIONS: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"
+      PEER_TIMEOUT_MS: "3600000"
+    ports:
+      - "5012:5005"
+  kvnode3:
+    environment:
+      JAVA_TOOL_OPTIONS: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"
+      PEER_TIMEOUT_MS: "3600000"
+    ports:
+      - "5013:5005"
+  proxy:
+    volumes:
+      - ./proxy/nginx.debug.conf:/etc/nginx/nginx.conf:ro

@@ -1,0 +1,98 @@
+# CS 450 Lab 2 -- three named nodes instead of one scaled service.
+#
+# Lab 1 ran `kvnode` and scaled it with --scale. That was fine when the nodes
+# did not know about each other. Lab 2 needs each node to have a name its peers
+# can dial, and to be stoppable on its own for the CP5 demo, so the three are
+# separate services.
+#
+# The rules from Lab 0 and Lab 1 have not changed:
+#   * no ports: on any kvnode -- the proxy is still the only way in
+#   * no container_name: on anything
+#   * do not rename kvnode1, kvnode2, kvnode3, proxy or client; the graders
+#     address them by name
+#
+# config/ is mounted read-only into all three at /etc/kv, so members.conf
+# inside it is one file and one source of truth -- edit it on your machine and
+# RELOAD picks it up, with no rebuild.
+#
+# Note it is the DIRECTORY that is mounted, not the file. Bind-mounting a single
+# file binds that file's inode, and most editors save by writing a new file and
+# renaming it over the old one -- which leaves the container still looking at
+# the inode that no longer has your edit in it. You would edit members.conf,
+# send RELOAD, get OK back, and see the old list. Mounting the directory makes
+# the rename visible, which is the whole of CP3 working.
+#
+# Each node gets its own named volume for the prepare log. That is what makes
+# "kill a node and start it again" a real test at CP5 rather than a reset.
+
+name: cs450-lab2
+
+x-kvnode: &kvnode
+  build: ./kvnode
+  expose:
+    - "8080"
+    - "9090"
+  restart: unless-stopped
+
+services:
+  kvnode1:
+    <<: *kvnode
+    environment:
+      NODE_ID: "kvnode1"
+      NODE_PORT: "8080"
+      KV_PORT: "9090"
+      MEMBERS_FILE: "/etc/kv/members.conf"
+      DATA_DIR: "/var/lib/kv"
+      PEER_TIMEOUT_MS: "5000"
+    volumes:
+      - ./config:/etc/kv:ro
+      - kvnode1-data:/var/lib/kv
+
+  kvnode2:
+    <<: *kvnode
+    environment:
+      NODE_ID: "kvnode2"
+      NODE_PORT: "8080"
+      KV_PORT: "9090"
+      MEMBERS_FILE: "/etc/kv/members.conf"
+      DATA_DIR: "/var/lib/kv"
+      PEER_TIMEOUT_MS: "5000"
+    volumes:
+      - ./config:/etc/kv:ro
+      - kvnode2-data:/var/lib/kv
+
+  kvnode3:
+    <<: *kvnode
+    environment:
+      NODE_ID: "kvnode3"
+      NODE_PORT: "8080"
+      KV_PORT: "9090"
+      MEMBERS_FILE: "/etc/kv/members.conf"
+      DATA_DIR: "/var/lib/kv"
+      PEER_TIMEOUT_MS: "5000"
+    volumes:
+      - ./config:/etc/kv:ro
+      - kvnode3-data:/var/lib/kv
+
+  proxy:
+    build: ./proxy
+    depends_on:
+      - kvnode1
+      - kvnode2
+      - kvnode3
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+  client:
+    build: ./client
+    depends_on:
+      - proxy
+    environment:
+      KV_TARGET: "http://proxy:8080"
+    command: ["sleep", "infinity"]
+
+volumes:
+  kvnode1-data:
+  kvnode2-data:
+  kvnode3-data:

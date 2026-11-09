@@ -1,0 +1,55 @@
+#!/bin/bash
+# CS 450 Lab 2 -- tiny client wrapper.
+#
+# The HTTP side is unchanged from Lab 1. What is new is 'tcp', which saves you
+# typing `echo ... | nc ...` several hundred times this month, and 'ring',
+# which asks all three nodes the same thing so you can see whether they agree.
+set -euo pipefail
+
+TARGET="${KV_TARGET:-http://proxy:8080}"
+NODES="${KV_NODES:-kvnode1 kvnode2 kvnode3}"
+PORT="${KV_PORT:-9090}"
+
+usage() {
+  cat <<'USAGE'
+usage: kv <command>
+
+  whoami            ask the cluster which node answered
+  health            health-check the node that answers
+  spread [N]        send N requests (default 12), count the distinct nodes
+
+  tcp <node> <request...>    send one request line to one node, print the reply
+  ring <request...>          send the same request to every node in turn
+
+examples
+  kv tcp kvnode1 PUT colour green
+  kv ring GET colour
+  kv ring CLOCK
+USAGE
+}
+
+one() {   # one <node> <request...>
+  local node="$1"; shift
+  printf '%s\n' "$*" | nc -w 10 "$node" "$PORT" | head -1 | tr -d '\r'
+}
+
+case "${1:-}" in
+  whoami)  curl -fsS "$TARGET/whoami" ;;
+  health)  curl -fsS "$TARGET/health" ;;
+  spread)
+    n="${2:-12}"
+    for _ in $(seq 1 "$n"); do curl -fsS "$TARGET/whoami"; done | sort | uniq -c | sort -rn
+    ;;
+  tcp)
+    [ $# -ge 3 ] || { usage; exit 2; }
+    node="$2"; shift 2
+    one "$node" "$@"
+    ;;
+  ring)
+    [ $# -ge 2 ] || { usage; exit 2; }
+    shift
+    for node in $NODES; do printf '%-9s %s\n' "$node" "$(one "$node" "$@")"; done
+    ;;
+  ""|-h|--help|help) usage ;;
+  *) echo "unknown command: $1" >&2; usage; exit 2 ;;
+esac
