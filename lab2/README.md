@@ -3,7 +3,7 @@
 **Released:** Mon Nov 9 · **CP3 due:** Fri Nov 20 · **CP4 due:** Wed Nov 25 ·
 **CP5 and Lab 2 due:** Mon Nov 30 · all 11:59 pm
 
-**Last updated:** Sun Nov 8 — changelog at the end.
+**Last updated:** Mon Nov 9 — changelog at the end.
 
 This handout is the specification for Lab 2. The Canvas assignments carry the due
 date, the points and the submission box, and send you back here for everything
@@ -30,7 +30,7 @@ nodes out of three is worse than a write that fails.
 Those are membership, mutual exclusion and atomic commit, and they are
 checkpoints 3, 4 and 5.
 
-The storage is still about twenty lines. It is still not the lab.
+The storage is still about twenty lines. Everything else is still the lab.
 
 ---
 
@@ -58,6 +58,33 @@ days later, over the holiday weekend, and it is the hardest code in this course.
 Do not wait for CP4 to be submitted before you start reading §"Checkpoint 5" —
 the commit protocol wraps around the lock, so you can design both at once even
 though you build them in order.
+
+---
+
+## How this lab is graded
+
+Two separate things, in two separate Canvas items.
+
+**The three checkpoints are where your code is submitted.** 10 points each,
+pass/fail, on one question: does the code at that tag work? `validate.sh`
+decides it and the grader runs the same checks. Tag, run
+`./scripts/submit.sh`, then paste your repository URL and the tag in that
+checkpoint's Canvas box. Checkpoints cannot be submitted late.
+
+**The Lab 2 assignment is where the screencast goes, and where your code is
+read.** 100 points. Thirty of them are the screencast. The other seventy are me
+reading the commit at your `cp5` tag — there is nothing extra to submit for
+that. Several of the things I look at are things `validate.sh` cannot test:
+
+- whether a participant genuinely *writes* the value before it votes, rather
+  than holding it in memory
+- whether your lock is the algorithm, or five races that happened to pass
+- where your clock is updated
+- whether someone else could pick the code up
+
+So a `cp5` tag that passes the checker can still lose marks on Lab 2. The rubric
+on that assignment lists every criterion and the partial credit available. Read
+it before you tag, not after.
 
 ---
 
@@ -283,6 +310,9 @@ submitting a tag that does not pass.
 ./scripts/submit.sh cp3
 ```
 
+Then paste your repository URL and the tag in the **CP3** box in Canvas. The
+script pushes the tag; Canvas is how I know to go looking for it.
+
 Same rules as every checkpoint: commit first, and if it prints anything other
 than "Submitted", you have not submitted.
 
@@ -369,6 +399,9 @@ submitting a tag that does not pass.
 ./scripts/submit.sh cp4
 ```
 
+Then paste your repository URL and the tag in the **CP4** box in Canvas. The
+script pushes the tag; Canvas is how I know to go looking for it.
+
 ---
 
 ## Checkpoint 5 and Lab 2 — Mon Nov 30
@@ -439,8 +472,14 @@ validate is submitting a tag that does not pass.
 ./scripts/submit.sh cp5
 ```
 
-Then upload **one screencast** to the **Lab 2** assignment in Canvas, **five
-minutes at most**. It is the whole write-up for this lab.
+Then paste your repository URL and the `cp5` tag in the **CP5** box in Canvas,
+as at the other two checkpoints.
+
+Then upload **one screencast** to the **Lab 2** assignment, **five minutes at
+most**. There is no PDF: the screencast is the only thing you write up. It is
+not, however, the only thing graded on that assignment — the commit at your
+`cp5` tag is read for quality, which is the larger half of those 100 points. See
+§"How this lab is graded".
 
 Spend roughly the first two minutes showing it work: a three-node `PUT` landing
 on all three, then a node killed mid-transaction and whatever your system then
@@ -460,8 +499,9 @@ screen:
 One take is fine, and so is a retake. We are listening for whether you know
 what your own code does, not for production polish.
 
-**The checkpoints are pass/fail and cannot be submitted late. The screencast is
-graded on content, and the late policy in the syllabus applies to it.**
+**The checkpoints are pass/fail and cannot be submitted late. The Lab 2
+assignment — the screencast and the quality of your code together — is graded on
+content, and the late policy in the syllabus applies to it.**
 
 ---
 
